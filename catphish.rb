@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # catphish - Domain Suggester
-# version: 0.0.2
+# version: 0.0.3
 # author: Viet Luu
 # web: www.ring0lab.com
 
@@ -10,10 +10,13 @@
 # more algorithms
 
 require 'resolv'
+require 'getoptlong'
 
 @DOMAIN = nil
 @TYPE = nil
-@VERSION = '0.0.2'
+@ALL = false
+@HELP = false
+@VERSION = '0.0.3'
 @LOGO = "
  ██████╗ █████╗ ████████╗██████╗ ██╗  ██╗██╗███████╗██╗  ██╗
 ██╔════╝██╔══██╗╚══██╔══╝██╔══██╗██║  ██║██║██╔════╝██║  ██║
@@ -98,7 +101,7 @@ def analyze_domain
 	domain_container = []
 	domain_container.push(['standard', domain])
 
-	methods = ['SingularOrPluralise', 'mirrorization', 'homoglyphs', 'dashOmission']
+	methods = ['SingularOrPluralise', 'prependOrAppend', 'homoglyphs', 'doubleExtensions', 'mirrorization', 'dashOmission']
 
 	methods.each do |m|
 		case m
@@ -147,6 +150,25 @@ def analyze_domain
 					domain_container.push([m,d])
 				end
 			end
+		when 'dashOmission'
+			d = domain.clone
+			if (d.include?('-'))
+				d = d.gsub('-', '')
+				domain_container.push([m,d])
+			end
+		when 'prependOrAppend'
+			words = ['www-', '-www', 'http-', '-https']
+			words.each do |w|
+				d = domain.clone
+				if (w[0] == '-')
+					d = d + w
+				else
+					d = w + d
+				end
+				domain_container.push([m,d])
+			end
+		when 'doubleExtensions'
+			domain_container.push([m, @DOMAIN.split('.')[0] + '-' +  @DOMAIN.split('.')[1]])
 		end
 	end
 	start_whois(domain_container.uniq)
@@ -172,7 +194,9 @@ def start_whois(domain)
 			thread << Thread.new {
 			begin
 				if !(Resolv.getaddress "#{d[1] + extension}").nil?
-					printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
+					if @ALL
+						printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
+					end
 				end
 			rescue Exception
 				printf "%-30s %-30s %s\n", d[0], d[1] + extension, "\e[32mAvailable\e[0m"
@@ -182,22 +206,41 @@ def start_whois(domain)
 	end
 end
 
-if (ARGV.include?('-d'))
-	ARGV.each.with_index do |argv, index|
-		case argv
-		when '-d'
-		@DOMAIN = ARGV[index + 1]
-	    when '-t'
-	    @TYPE = ARGV[index + 1]
-	   	end
-	end
-	analyze_domain
-else
+def usage
 	puts @LOGO
-	puts "USAGE:\n\ncatphish -d domain [options,..]\n\n"
-	printf "%-20s %s\n", "-c", "Custom level domain"
-	printf "%-20s %s\n", "-d", "Domain to analyze"
-	printf "%-20s %s\n\n", "-t", "Type of level domains: (popular, country, generic) -- Default: popular"
+	puts "USAGE:\n\n#{$0} -d domain [option,..]\n\n"
+	printf "%-20s %s\n", "\s\s\s-c, --custom", "Custom level domain"
+	printf "%-20s %s\n", "\s\s\s-d, --domain", "[REQUIRED ARGUMENT] Domain to analyze"
+	printf "%-20s %s\n", "\s\s\s-t, --type", "Type of level domains: (popular, country, generic) -- Default: popular"
+	printf "%-20s %s\n\n", "\s\s\s-a, --all", "Show all domains, including not available ones"
 end
 
+if ARGV.length < 2
+  usage
+  exit 0
+end
 
+if (ARGV.include?('-d') || ARGV.include?('--domain'))
+	ARGV.each.with_index do |argv, index|
+		case argv
+		when '-d', '--domain'
+		@DOMAIN = ARGV[index + 1]
+		if (@DOMAIN.split('.')[1]).nil?
+			puts "\nExtension required. Example: #{@DOMAIN.split('.')[0]}.com\n\n"
+			exit 0
+		end
+	    when '-t', '--type'
+	    @TYPE = ARGV[index + 1]
+	    when '-a', '--all'
+	    @ALL = true
+	    when '-h', '--help'
+	    @HELP = true
+	    usage
+	   	end
+	end
+	if !(@HELP)
+		analyze_domain
+	end
+else
+	usage
+end

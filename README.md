@@ -5,6 +5,8 @@ Analyzie target domain to generate smiliar-looking domains for phishing attacks.
 
 #Current Algorithms
 * SingularOrPluralise 
+* prependOrAppend
+* doubleExtensions
 * mirrorization
 * homoglyphs
 * dashOmission
