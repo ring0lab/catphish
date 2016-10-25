@@ -1,4 +1,4 @@
-#CATPHISH v.0.0.2
+#CATPHISH v.0.0.3
 Analyzie target domain to generate smiliar-looking domains for phishing attacks. 
 
 ![alt tag](https://github.com/ring0lab/catphish/blob/master/image1.png)
