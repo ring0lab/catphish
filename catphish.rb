@@ -11,12 +11,17 @@
 
 require 'resolv'
 require 'getoptlong'
+require 'simpleidn'
+require 'whois'
+require 'whois-parser'
+
 
 @DOMAIN = nil
+@METHOD = nil
 @TYPE = nil
 @ALL = false
 @HELP = false
-@VERSION = '0.0.3'
+@VERSION = '0.0.4'
 @LOGO = "
  ██████╗ █████╗ ████████╗██████╗ ██╗  ██╗██╗███████╗██╗  ██╗
 ██╔════╝██╔══██╗╚══██╔══╝██╔══██╗██║  ██║██║██╔════╝██║  ██║
@@ -96,16 +101,21 @@ require 'getoptlong'
 ".wedding", ".whoswho", ".wiki", ".win", ".wine", ".work", ".works", ".world", ".wtf", ".xxx", ".xyz", ".yoga", ".zone"
 ]
 
+
 def analyze_domain
 	domain = @DOMAIN.split('.')[0]
 	domain_container = []
-	domain_container.push(['standard', domain])
-
-	methods = ['SingularOrPluralise', 'prependOrAppend', 'homoglyphs', 'doubleExtensions', 'mirrorization', 'dashOmission']
+    
+    if @METHOD
+    	methods = [@METHOD]
+	else
+		methods = ['SingularOrPluralise', 'prependOrAppend', 'homoglyphs', 'doubleExtensions', 'mirrorization', 'dashOmission']
+	end
 
 	methods.each do |m|
 		case m
 		when 'mirrorization'
+			domain_container.push(['standard', domain])
 			(0...domain.size).each do |i|
 				d = domain.clone
 				if (i == domain.size - 2 || d[i+1] == '-')
@@ -120,6 +130,7 @@ def analyze_domain
 				domain_container.push([m,d])
 			end
 		when 'SingularOrPluralise'
+			domain_container.push(['standard', domain])
 			d = domain.clone
 			if (d[domain.size - 1] == 's')
 				d = d.chomp(d[domain.size - 1])
@@ -129,6 +140,7 @@ def analyze_domain
 				domain_container.push([m,d])
 			end
 		when 'homoglyphs'
+			domain_container.push(['standard', domain])
 			substitute_characters = 
 			{
 			"0" => "o", "1" => "l", "o" => "0", "m" => "rm", "d" => "cl",
@@ -151,12 +163,14 @@ def analyze_domain
 				end
 			end
 		when 'dashOmission'
+			domain_container.push(['standard', domain])
 			d = domain.clone
 			if (d.include?('-'))
 				d = d.gsub('-', '')
 				domain_container.push([m,d])
 			end
 		when 'prependOrAppend'
+			domain_container.push(['standard', domain])
 			words = ['www-', '-www', 'http-', '-https']
 			words.each do |w|
 				d = domain.clone
@@ -168,7 +182,53 @@ def analyze_domain
 				domain_container.push([m,d])
 			end
 		when 'doubleExtensions'
+			domain_container.push(['standard', domain])
 			domain_container.push([m, @DOMAIN.split('.')[0] + '-' +  @DOMAIN.split('.')[1]])
+		when 'Punycode'
+			@D2 = domain.clone
+			vietnamese_chars_map = 
+			{
+				"a" => ["\u1EA1"], "e" => ["\u1EB9"], "d" => ["\u0111"], "i" => ["\u1EC9", "\u1ECB"],
+				"o" => ["\u1ECD"], "u" => ["\u1EE5"], "y" => ["\u1EF7"]
+ 			}	
+ 			cyrillic_chars_map = 
+ 			{
+ 				"a" => "\u0430", "b" => "\u0432", "c" => "\u0441", "e" => "\u0435",
+ 				"f" => "\u0493", "h" => "\u04BB", "i" => "\u0456", "k" => "\u043A",
+ 				"l" => "\u04CF", "m" => "\u043C", "n" => "\u04E5", "o" => "\u043E",
+ 				"p" => "\u0440", "r" => "\u0433", "s" => "\u0455", "t" => "\u0442",
+ 				"u" => "\u0446", "w" => "\u0428", "x" => "\u0445", "y" => "\u0423"
+ 			}
+
+			vietnamese_chars_map.each do |k, v|
+				(0...domain.size).each do |i|
+					d = domain.clone
+					if (d[i] == k)
+						(0...v.size).each do |i2|
+							d[i] = v[i2]
+							@D2[i] = v[i2]
+							domain_container.push([m,d, SimpleIDN.to_ascii(d)])
+						end
+					end
+				end
+			end
+			domain_container.push([m,@D2, SimpleIDN.to_ascii(@D2)])
+
+			d = domain.clone
+			punyValid = true
+			if domain =~ /d|g|q|v|z/
+				punyValid = false
+			end
+			cyrillic_chars_map.each do |k, v|
+				(0...domain.size).each do |i|
+					if (d[i] == k)
+						d[i] = v
+					end
+				end
+			end
+			if punyValid
+				domain_container.push([m,d, SimpleIDN.to_ascii(d)])
+			end
 		end
 	end
 	start_whois(domain_container.uniq)
@@ -187,30 +247,46 @@ def start_whois(domain)
 		@TYPE = @POPULAR_TOP_DOMAINS.clone
 	end
 
-	printf "%-30s %-30s %s\n\n", "Type", "Domain", "Status"
-
-	@TYPE.each do |extension|
+	if @METHOD == "Punycode"
+		printf "%-30s %-30s %-30s %s\n\n", "Type", "Domain", "Punycode", "Status"
+		extension = ".com"
 		domain.each do |d|
 			thread << Thread.new {
-			begin
-				if !(Resolv.getaddress "#{d[1] + extension}").nil?
-					if @ALL
-						printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
-					end
+			if (Whois.whois("#{d[2] + extension}").parser.available?)
+				printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2].to_s + extension, "\e[32mAvailable\e[0m"
+			else
+				if @ALL
+					printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2].to_s + extension, "Not Available"
 				end
-			rescue Exception
-				printf "%-30s %-30s %s\n", d[0], d[1] + extension, "\e[32mAvailable\e[0m"
-			end}
+			end
+			}
 		end
 		thread.each {|t| t.join}
+	else
+		printf "%-30s %-30s %s\n\n", "Type", "Domain", "Status"
+		@TYPE.each do |extension|
+			domain.each do |d|
+				thread << Thread.new {
+				begin
+					if !(Resolv.getaddress "#{d[1] + extension}").nil?
+						if @ALL
+							printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
+						end
+					end
+				rescue Exception
+					printf "%-30s %-30s %s\n", d[0], d[1] + extension, "\e[32mAvailable\e[0m"
+				end}
+			end
+			thread.each {|t| t.join}
+		end
 	end
 end
 
 def usage
 	puts @LOGO
 	puts "USAGE:\n\n#{$0} -d domain [option,..]\n\n"
-	printf "%-20s %s\n", "\s\s\s-c, --custom", "Custom level domain"
 	printf "%-20s %s\n", "\s\s\s-d, --domain", "[REQUIRED ARGUMENT] Domain to analyze"
+	printf "%-20s %s\n", "\s\s\s-m, --method", "SingularOrPluralise, mirrorization.. -- Default: all"
 	printf "%-20s %s\n", "\s\s\s-t, --type", "Type of level domains: (popular, country, generic) -- Default: popular"
 	printf "%-20s %s\n\n", "\s\s\s-a, --all", "Show all domains, including not available ones"
 end
@@ -231,6 +307,8 @@ if (ARGV.include?('-d') || ARGV.include?('--domain'))
 		end
 	    when '-t', '--type'
 	    @TYPE = ARGV[index + 1]
+		when '-m', '--method'
+		@METHOD = ARGV[index +1]
 	    when '-a', '--all'
 	    @ALL = true
 	    when '-h', '--help'
