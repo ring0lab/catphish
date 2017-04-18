@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # catphish - Domain Suggester
-# version: 0.0.4
+# version: 0.0.5
 # author: Viet Luu
 # web: www.ring0lab.com
 
@@ -21,7 +21,7 @@ require 'whois-parser'
 @TYPE = nil
 @ALL = false
 @HELP = false
-@VERSION = '0.0.4'
+@VERSION = '0.0.5'
 @LOGO = "
  ██████╗ █████╗ ████████╗██████╗ ██╗  ██╗██╗███████╗██╗  ██╗
 ██╔════╝██╔══██╗╚══██╔══╝██╔══██╗██║  ██║██║██╔════╝██║  ██║
@@ -186,10 +186,20 @@ def analyze_domain
 			domain_container.push([m, @DOMAIN.split('.')[0] + '-' +  @DOMAIN.split('.')[1]])
 		when 'Punycode'
 			@D2 = domain.clone
-			vietnamese_chars_map = 
+			# Current langs: Vietnamese, Croation and Czech
+			chars_map = 
 			{
-				"a" => ["\u1EA1"], "e" => ["\u1EB9"], "d" => ["\u0111"], "i" => ["\u1EC9", "\u1ECB"],
-				"o" => ["\u1ECD"], "u" => ["\u1EE5"], "y" => ["\u1EF7"]
+				"a" => ["\u1EA1", "\u0101", "\u0203", "\u00E0", "\u00E1"], 
+				"e" => ["\u1EB9", "\u0113", "\u0207", "\u00E8", "\u00E9"], 
+				"c" => ["\u0107"],
+				"d" => ["\u0111", "\u010F"], 
+				"i" => ["\u1EC9", "\u1ECB", "\u012B", "\u00EC", "\u020B"],
+				"o" => ["\u1ECD", "\u014D", "\u020F", "\u00F2", "\u00F3"], 
+				"u" => ["\u1EE5", "\u016B", "\u0217", "\u00F9", "\u00FA"], 
+				"r" => ["\u0155", "\u0213"],
+				"t" => ["\u0165"],
+				"y" => ["\u1EF7", "\u00FD"],
+				"z" => ["\u017E"]
  			}	
  			cyrillic_chars_map = 
  			{
@@ -200,18 +210,30 @@ def analyze_domain
  				"u" => "\u0446", "w" => "\u0428", "x" => "\u0445", "y" => "\u0423"
  			}
 
-			vietnamese_chars_map.each do |k, v|
+			chars_map.each do |k, v|
+				d = domain.clone
 				(0...domain.size).each do |i|
-					d = domain.clone
 					if (d[i] == k)
 						(0...v.size).each do |i2|
 							d[i] = v[i2]
 							@D2[i] = v[i2]
 							domain_container.push([m,d, SimpleIDN.to_ascii(d)])
+							d = domain.clone
 						end
 					end
 				end
+				
+				domain_container.each do |domain|
+					temp_domain = []
+					(0...v.size).each do |i3|
+						temp_domain.push(domain[1].gsub!(k, v[i3]))
+						if !temp_domain[0].nil?
+							domain_container.push([m,temp_domain[0], SimpleIDN.to_ascii(temp_domain[0])])
+						end
+					end
+				end	
 			end
+
 			domain_container.push([m,@D2, SimpleIDN.to_ascii(@D2)])
 
 			d = domain.clone
