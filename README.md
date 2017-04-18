@@ -1,3 +1,8 @@
+#CATPHISH v.0.0.4
+Added Punycode algorithm for vietnamese and cyrillic characters map.
+
+![alt tag](https://github.com/ring0lab/catphish/blob/master/image3.png)
+
 #CATPHISH v.0.0.3
 Analyzie target domain to generate smiliar-looking domains for phishing attacks. 
 
@@ -10,6 +15,7 @@ Analyzie target domain to generate smiliar-looking domains for phishing attacks.
 * mirrorization
 * homoglyphs
 * dashOmission
+* Punycode
 
 #HOW TO USE
 
