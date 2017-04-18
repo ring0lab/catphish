@@ -1,6 +1,10 @@
 #CATPHISH v.0.0.4
 Added Punycode algorithm for vietnamese and cyrillic characters map.
 
+```ruby
+ruby catphish.rb -d microsoft.com -m Punycode -a
+```
+
 ![alt tag](https://github.com/ring0lab/catphish/blob/master/image3.png)
 
 #CATPHISH v.0.0.3
