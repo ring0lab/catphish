@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 # catphish - Domain Suggester
-# version: 0.0.3
+# version: 0.0.4
 # author: Viet Luu
 # web: www.ring0lab.com
 
