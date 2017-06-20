@@ -1,3 +1,7 @@
+# Installation
+```root@kali:~/catphish# bundle install
+```
+
 # CATPHISH v.0.0.5
 
 Added more languages. Improved generator code.
