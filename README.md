@@ -1,3 +1,8 @@
+# Installation
+```
+root@kali:~/catphish# bundle install
+```
+
 # CATPHISH v.0.0.5
 
 Added more languages. Improved generator code.
@@ -5,7 +10,7 @@ Added more languages. Improved generator code.
 # CATPHISH v.0.0.4
 Added Punycode algorithm for vietnamese and cyrillic characters map.
 
-```ruby
+```
 ruby catphish.rb -d microsoft.com -m Punycode -a
 ```
 
