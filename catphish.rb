@@ -6,7 +6,6 @@
 # author: Kent 'picat' Gruber
 # web: www.ring0lab.com
 
-
 # Next update
 # more algorithms
 
@@ -14,7 +13,6 @@ require 'set'
 require 'trollop'
 require 'resolv'
 require 'simpleidn'
-require 'whois'
 require 'whois-parser'
 
 module Catphish
@@ -114,201 +112,198 @@ module Catphish
     "q" => "g", "u" => "v", "v" => "u", "w" => "vv", "y" => "v"
   }
 
-  #METHODS = ['SingularOrPluralise', 'prependOrAppend', 'homoglyphs', 'doubleExtensions', 'mirrorization', 'dashOmission']
-
-  #:def self.analyze_domain(domain)
-  #:  domain = domain.split('.')[0]
-  #:  domain_container = []
-  #:end
-
-  def self.methods
-    return METHODS unless block_given?
-    METHODS.each { |method| yield method }
+  # Create a new container, optionally in a block syntax.
+  def self.new_container
+    return Set.new unless block_given?
+    yield Set.new
   end
 
+  # Mirrorization method.
   def self.mirrorization(domain)
     domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << (['Standard', domain])
-    (0...domain.size).each do |i|
-      d = domain.clone
-      if (i == domain.size - 2 || d[i+1] == '-')
-        d[i+1] = d[i] + d[i+1]
-      elsif (d[i] == '-')
-        d[i] = d[i]
-      elsif (d[i] == d[i+1] || d[i] == d[i-1])
-        # do nothing
-      else
-        d[i+1] = d[i]
-      end	
-      domain_container << ['Mirrorization',d]
+    new_container do |container|
+      (0...domain.size).each do |i|
+        d = domain.clone
+        if (i == domain.size - 2 || d[i+1] == '-')
+          d[i+1] = d[i] + d[i+1]
+        elsif (d[i] == '-')
+          d[i] = d[i]
+        elsif (d[i] == d[i+1] || d[i] == d[i-1])
+          # do nothing
+        else
+          d[i+1] = d[i]
+        end
+        # names like google.com seem to trick this up
+        container << ['Mirrorization',d] unless d == domain
+      end
+      container 
     end
-    domain_container
   end
 
+  # Singular or plural method.
   def self.singular_or_pluralise(domain)
     domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << ['Standard', domain]
-    d = domain.clone
-    if (d[domain.size - 1] == 's')
-      d = d.chomp(d[domain.size - 1])
-      domain_container << ['SingularOrPluralise',d]
-    else
-      d[domain.size] = "s"
-      domain_container << ['SingularOrPluralise',d]
+    new_container do |container|
+      if (domain[domain.size - 1] == 's')
+        container << ['SingularOrPluralise', domain.chomp(domain[domain.size - 1])]
+      else
+        container << ['SingularOrPluralise', domain + "s"]
+      end
     end
   end
 
   def self.prepend_or_append(domain) 
     domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << ['Standard', domain]
-    words = ['www-', '-www', 'http-', '-https']
-    words.each do |w|
-      d = domain.clone
-      if (w[0] == '-')
-        d = d + w
-      else
-        d = w + d
+    words  = ['www-', '-www', 'http-', '-https']
+    new_container do |container|
+      words.each do |w|
+        d = domain.clone
+        if (w[0] == '-')
+          d = d + w
+        else
+          d = w + d
+        end
+        container << ['PrependOrAppend',d]
       end
-      domain_container << ['PrependOrAppend',d]
+      container
     end
-    domain_container
   end
 
   def self.homoglyphs(domain)
     domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << ['Standard', domain]
-    HOMOGLYPH_SUBSTITUTE_CHARACTERS.each do |k, v|
-      (0...domain.size).each do |i|
-        d, d2 = domain.clone, domain.clone
-        if (d[i] == k)
-          d[i] = v
-          domain_container << ['Homoglyphs',d]
-          domain_container << ['Homoglyphs',d2 = d2.gsub(k, v)]
-        end
+    new_container do |container|
+      HOMOGLYPH_SUBSTITUTE_CHARACTERS.each do |k, v|
+        next unless domain.include?(k)
+        container << ['Homoglyphs', domain.sub(k, v)]
+        container << ['Homoglyphs', domain.gsub(k, v)]
       end
-      d = domain.clone
-      if (d.include?("cl"))
-        d = d.sub('cl', 'd')
-        domain_container << ['Homoglyphs',d]
-      end
+      container << ['Homoglyphs',domain.sub('cl', 'd')]
+      container << ['Homoglyphs',domain.gsub('cl', 'd')]
     end
-    domain_container
   end
 
 
   def self.double_extensions(domain)
-    domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << ['Standard', domain]
-    return [] if domain.split('.')[1].nil?
-    domain_container << ['Double Extensions', domain.split('.')[0] + '-' +  domain.split('.')[1]]
-    domain_container
+    new_container do |container|
+      container << ['DoubleExtensions', domain.split('.')[0] + '-' +  domain.split('.')[1]]
+    end
   end
 
   def self.dash_omission(domain)
     domain = domain.split('.')[0]
-    domain_container = Set.new
-    domain_container << ['Standard', domain]
-    d = domain.clone
-    if (d.include?('-'))
-      d = d.gsub('-', '')
-      domain_container << ['Dash Omission',d]
-    end
-    domain_container
+    new_container do |container|
+      if (domain.include?('-'))
+        container << ['DashOmission', domain.gsub('-', '')]
+      end
+      container
+    end 
   end
 
   def self.punycode(domain)
     domain = domain.split('.')[0]
-    domain_container = Set.new
+    new_container do |container|
+      @D2 = domain.clone
+      CHARS_MAP.each do |k, v|
+        d = domain.clone
+        (0...domain.size).each do |i|
+          if (d[i] == k)
+            (0...v.size).each do |i2|
+              d[i] = v[i2]
+              @D2[i] = v[i2]
+              container << ['Punycode',d, SimpleIDN.to_ascii(d)]
+              d = domain.clone
+            end
+          end
+        end
 
-    @D2 = domain.clone
+        cont = container.dup
+        cont.each do |domain|
+          temp_domain = []
+          (0...v.size).each do |i3|
+            temp_domain << (domain[1].gsub!(k, v[i3]))
+            if !temp_domain[0].nil?
+              container << ['Punycode',temp_domain[0], SimpleIDN.to_ascii(temp_domain[0])]
+            end
+          end
+        end	
+      end
 
-    CHARS_MAP.each do |k, v|
+      container << ['Punycode',@D2, SimpleIDN.to_ascii(@D2)]
+
       d = domain.clone
-      (0...domain.size).each do |i|
-        if (d[i] == k)
-          (0...v.size).each do |i2|
-            d[i] = v[i2]
-            @D2[i] = v[i2]
-            domain_container << ['Punycode',d, SimpleIDN.to_ascii(d)]
-            d = domain.clone
+      punyValid = true
+      if domain =~ /d|g|q|v|z/
+        punyValid = false
+      end
+      CYRILLIC_CHARS_MAP.each do |k, v|
+        (0...domain.size).each do |i|
+          if (d[i] == k)
+            d[i] = v
           end
         end
       end
-
-      container = domain_container.dup
-      container.each do |domain|
-        temp_domain = []
-        (0...v.size).each do |i3|
-          temp_domain << (domain[1].gsub!(k, v[i3]))
-          if !temp_domain[0].nil?
-            domain_container << ['Punycode',temp_domain[0], SimpleIDN.to_ascii(temp_domain[0])]
-          end
-        end
-      end	
-    end
-
-    domain_container << ['Punycode',@D2, SimpleIDN.to_ascii(@D2)]
-
-    d = domain.clone
-    punyValid = true
-    if domain =~ /d|g|q|v|z/
-      punyValid = false
-    end
-    CYRILLIC_CHARS_MAP.each do |k, v|
-      (0...domain.size).each do |i|
-        if (d[i] == k)
-          d[i] = v
-        end
+      if punyValid
+        container << ['Punycode',d, SimpleIDN.to_ascii(d)]
       end
+      container 
+    end 
+  end
+
+  def self.whois_information(domain, extension = nil, retries = 1)
+    domain = domain + extension if extension
+    begin
+      Whois.whois(domain + extension).parser.available?
+    rescue
+      retry if (retries -= 1) >= 0
     end
-    if punyValid
-      domain_container << ['Punycode',d, SimpleIDN.to_ascii(d)]
+  end
+
+  def self.resolv_information(domain, extension = nil, retries = 1)
+    domain = domain + extension if extension 
+    begin
+      Resolv.getaddress domain
+    rescue
+      retry if (retries -= 1) >= 0
     end
-    domain_container
   end
 
   def self.start(domain_container, domain_types: POPULAR_TOP_DOMAINS, all: false, punycode: false, header: false)
-    threads = []
     if punycode
       printf "%-30s %-30s %-30s %s\n\n", "Type", "Domain", "Punycode", "Status" if header
-      extension = ".com"
-      domain_container.each do |d|
-        threads << Thread.new do
-          if (Whois.whois("#{d[2] + extension}").parser.available?)
-            printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2].to_s + extension, "\e[32mAvailable\e[0m"
-          else
-            if all
-              printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2].to_s + extension, "Not Available"
-            end
-          end
-        end
-      end
-      thread.each {|t| t.join}
     else
       printf "%-30s %-30s %s\n\n", "Type", "Domain", "Status" if header
+    end
+    threads = []
+    domain_container.each do |d|
       domain_types.each do |extension|
-        domain_container.each do |d|
-          threads << Thread.new do
+        threads << Thread.new do
+          if punycode
+            if whois_information(d[2] || d[1], extension) 
+              if d[2].nil? 
+                printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, "none", "\e[32mAvailable\e[0m"
+              else
+                printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2] + extension, "\e[32mAvailable\e[0m"
+              end
+            elsif all
+              printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, d[2], "Not Available"
+            end
+          else
             begin
-              if !(Resolv.getaddress "#{d[1] + extension}").nil?
-                if all
-                  printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
-                end
+              if Resolv.getaddress("#{d[1] + extension}") and all
+                printf "%-30s %-30s %s\n", d[0], d[1] + extension, "Not Available"
               end
             rescue Exception
-              printf "%-30s %-30s %s\n", d[0], d[1] + extension, "\e[32mAvailable\e[0m"
+              if punycode
+                printf "%-30s %-30s %-30s %s\n", d[0], d[1] + extension, "none", "\e[32mAvailable\e[0m"
+              else
+                printf "%-30s %-30s %s\n", d[0], d[1] + extension, "\e[32mAvailable\e[0m"
+              end 
             end
           end
         end
-        threads.each {|t| t.join}
       end
-    end
-
+    end  
+    threads.each(&:join)
   end
 
   def self.logo
@@ -325,54 +320,71 @@ module Catphish
     "
   end
 
-
 end
 
 ARGV[0] = '-h' if ARGV.empty?
 
 opts = Trollop::options do
   banner Catphish.logo
-  opt :logo,                  "ASCII art banner",                                   type: :bool,    default: true
-  opt :column_header,         "Header for each column of the output",               type: :bool,    default: true
-  opt :Domain,                "Target domain to analyze",                           type: :string, required: (ARGV[0] == '-h' ? false : true)
-  opt :type,                  "Type of level domains: (popular, country, generic)", type: :string,  default: 'popular'
-  opt :Verbose,               "Show all domains, including non-available ones",     type: :bool,    default: false
-  opt :All,                   "Use all of the possible methods",                    type: :bool,    default: false
-  opt :Mirrorization,         "Use the mirrorization method.",                      type: :bool,    default: false
-  opt :singular_or_pluralise, "Use the singular or pluralise method.",              type: :bool,    default: false
-  opt :prepend_or_append,     "Use the prepend or append method.",                  type: :bool,    default: false
-  opt :Homoglyphs,            "Use the homoglyphs method.",                         type: :bool,    default: false
-  opt :double_extensions,     "Use the double extensions method",                   type: :bool,    default: false
-  opt :Dash_omission,         "Use the dash omission method.",                      type: :bool,    default: false
-  opt :Punycode,              "Use the punycode method.",                           type: :bool,    default: false
+  opt :logo,                  "ASCII art banner",                                   type: :bool,     default: true
+  opt :column_header,         "Header for each column of the output",               type: :bool,     default: true
+  opt :Domain,                "Target domain to analyze",                           type: :string,  required: (ARGV[0] == '-h' ? false : true)
+  opt :type,                  "Type of level domains: (popular, country, generic)", type: :string,   default: 'popular'
+  opt :Verbose,               "Show all domains, including non-available ones",     type: :bool,     default: false
+  opt :All,                   "Use all of the possible methods",                    type: :bool,     default: false
+  opt :Mirrorization,         "Use the mirrorization method.",                      type: :bool,     default: false
+  opt :singular_or_pluralise, "Use the singular or pluralise method.",              type: :bool,     default: false
+  opt :prepend_or_append,     "Use the prepend or append method.",                  type: :bool,     default: false
+  opt :Top_level_domains,     "Use a specific ( set of ) top-level domain(s).",     type: :strings, required: false
+  opt :Homoglyphs,            "Use the homoglyphs method.",                         type: :bool,     default: false
+  opt :double_extensions,     "Use the double extensions method",                   type: :bool,     default: false
+  opt :Dash_omission,         "Use the dash omission method.",                      type: :bool,     default: false
+  opt :Punycode,              "Use the punycode method.",                           type: :bool,     default: false
 end
 
-domains = Set.new
-if opts[:All]
-  [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :dash_omission, :Punycode].each do |opt|
-    Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
-      domains << domain
+if opts[:Top_level_domains]
+  type = Catphish.new_container do |container|
+    opts[:Top_level_domains].each do |domain|
+      domain = "." + domain unless domain[0] == "."
+      container << domain
     end
+    container
   end
 else
-  [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :dash_omission, :Punycode].each do |opt|
-    next unless opts[opt]
-    Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
-      domains << domain
-    end
+  case opts[:type].downcase.to_sym
+  when :country
+    type = Catphish::COUNTRY_TOP_DOMAINS
+  when :generic 
+    type = Catphish::GENERIC_DOMAINS
+  else
+    type = Catphish::POPULAR_TOP_DOMAINS
   end
 end
 
-case opts[:type].downcase.to_sym
-when :country
-  type = Catphish::COUNTRY_TOP_DOMAINS
-when :generic 
-  type = Catphish::GENERIC_DOMAINS
-else
-  type = Catphish::POPULAR_TOP_DOMAINS
+domains = Catphish.new_container do |container|
+  if opts[:All]
+    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
+      Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
+        container << domain
+      end
+    end
+  else
+    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
+      next unless opts[opt]
+      Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
+        container << domain
+      end
+    end
+  end
+  container
 end
 
-if opts[:Punycode]
+if domains.empty?
+  puts "Nothing to process ( try other options )!"
+  exit 1
+end
+
+if opts[:Punycode] || opts[:All]
   puny = true
 else
   puny = false
