@@ -19,8 +19,10 @@ module Catphish
 
   VERSION = '0.0.5'
 
+  # Some popular domains to use.
   POPULAR_TOP_DOMAINS = ['.com', '.co', '.net', '.org', '.info']
 
+  # Some country domains to use.
   COUNTRY_TOP_DOMAINS = [
     ".ac", ".ad", ".ae", ".af", ".ag", ".ai", ".al", ".am", ".an", ".ao", ".aq", ".ar", ".as",
     ".at", ".au", ".aw", ".ax", ".az", ".ba", ".bb", ".bd", ".be", ".bf", ".bg", ".bh", ".bi",
@@ -43,6 +45,7 @@ module Catphish
     ".uk", ".us", ".uy", ".uz", ".va", ".vc", ".ve", ".vg", ".vi", ".vn", ".vu", ".wf", ".ws", 
     ".ye", ".yt", ".za", ".zm", ".zw" ]
 
+  # Some generic domains.
   GENERIC_DOMAINS = [
     ".academy", ".accountant", ".accountants", ".active", ".actor", ".adult", ".aero", 
     ".agency", ".airforce", ".apartments", ".app", ".archi", ".army", ".associates", 
@@ -83,6 +86,7 @@ module Catphish
     ".villas", ".vision", ".vodka", ".vote", ".voting", ".voyage", ".wang", ".watch", ".webcam", ".website", ".wed", 
     ".wedding", ".whoswho", ".wiki", ".win", ".wine", ".work", ".works", ".world", ".wtf", ".xxx", ".xyz", ".yoga", ".zone"]
 
+  # It's like a treasure map, but for chars.
   CHARS_MAP = {
     "a" => ["\u1EA1", "\u0101", "\u0203", "\u00E0", "\u00E1"], 
     "e" => ["\u1EB9", "\u0113", "\u0207", "\u00E8", "\u00E9"], 
@@ -106,6 +110,7 @@ module Catphish
     "u" => "\u0446", "w" => "\u0428", "x" => "\u0445", "y" => "\u0423"
   }
 
+  # Homoglyp substitute character mappings.
   HOMOGLYPH_SUBSTITUTE_CHARACTERS = {
     "0" => "o", "1" => "l", "o" => "0", "m" => "rm", "d" => "cl",
     "g" => "q", "i" => "l", "l" => "i", "p" => "q", "cl" => "d",
@@ -152,6 +157,7 @@ module Catphish
     end
   end
 
+  # Prepend or append method.
   def self.prepend_or_append(domain) 
     domain = domain.split('.')[0]
     words  = ['www-', '-www', 'http-', '-https']
@@ -169,6 +175,7 @@ module Catphish
     end
   end
 
+  # Homoglyphs method.
   def self.homoglyphs(domain)
     domain = domain.split('.')[0]
     new_container do |container|
@@ -181,14 +188,15 @@ module Catphish
       container << ['Homoglyphs',domain.gsub('cl', 'd')]
     end
   end
-
-
+  
+  # Double extensions method.
   def self.double_extensions(domain)
     new_container do |container|
       container << ['DoubleExtensions', domain.split('.')[0] + '-' +  domain.split('.')[1]]
     end
   end
 
+  # Dash omission method.
   def self.dash_omission(domain)
     domain = domain.split('.')[0]
     new_container do |container|
@@ -199,6 +207,7 @@ module Catphish
     end 
   end
 
+  # Punycode method.
   def self.punycode(domain)
     domain = domain.split('.')[0]
     new_container do |container|
@@ -249,6 +258,7 @@ module Catphish
     end 
   end
 
+  # Whois information for a given domain.
   def self.whois_information(domain, extension = nil, retries = 1)
     domain = domain + extension if extension
     begin
@@ -258,6 +268,7 @@ module Catphish
     end
   end
 
+  # IP Address information for a given domain.
   def self.resolv_information(domain, extension = nil, retries = 1)
     domain = domain + extension if extension 
     begin
@@ -267,6 +278,7 @@ module Catphish
     end
   end
 
+  # The "main" method of sorts of the application.
   def self.start(domain_container, domain_types: POPULAR_TOP_DOMAINS, all: false, punycode: false, header: false)
     if punycode
       printf "%-30s %-30s %-30s %s\n\n", "Type", "Domain", "Punycode", "Status" if header
@@ -306,6 +318,7 @@ module Catphish
     threads.each(&:join)
   end
 
+  # Logos are pretty cool.
   def self.logo
     "
  ██████╗ █████╗ ████████╗██████╗ ██╗  ██╗██╗███████╗██╗  ██╗
@@ -322,6 +335,7 @@ module Catphish
 
 end
 
+# Default to a help menu if nothing has been given.
 ARGV[0] = '-h' if ARGV.empty?
 
 opts = Trollop::options do
@@ -342,6 +356,8 @@ opts = Trollop::options do
   opt :Punycode,              "Use the punycode method.",                           type: :bool,     default: false
 end
 
+# If given top level domains, use those. Otherwise, use whatever was 
+# given for the type or default to popular domains.
 if opts[:Top_level_domains]
   type = Catphish.new_container do |container|
     opts[:Top_level_domains].each do |domain|
@@ -361,6 +377,7 @@ else
   end
 end
 
+# Get all of the domains we're interested in processing.
 domains = Catphish.new_container do |container|
   if opts[:All]
     [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
@@ -379,17 +396,21 @@ domains = Catphish.new_container do |container|
   container
 end
 
+# If there are no domains to process, then fail.
 if domains.empty?
   puts "Nothing to process ( try other options )!"
   exit 1
 end
 
+# Check if punycode is going to show up to the party.
 if opts[:Punycode] || opts[:All]
   puny = true
 else
   puny = false
 end
 
+# Print the logo to the screen, or maybe not.
 puts Catphish.logo if opts[:logo]
 
+# Start the heavy logic.
 Catphish.start(domains, domain_types: type, all: opts[:Verbose], punycode: puny, header: opts[:column_header])
