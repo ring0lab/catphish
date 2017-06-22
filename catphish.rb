@@ -1,13 +1,10 @@
 #!/usr/bin/env ruby
 
 # catphish - Domain Suggester
-# version: 0.0.5
+# version: 1.0.0
 # author: Viet Luu
 # author: Kent 'picat' Gruber
 # web: www.ring0lab.com
-
-# Next update
-# more algorithms
 
 require 'set'
 require 'trollop'
@@ -17,7 +14,7 @@ require 'whois-parser'
 
 module Catphish
 
-  VERSION = '0.0.5'
+  VERSION = '1.0.0'
 
   # Some popular domains to use.
   POPULAR_TOP_DOMAINS = ['.com', '.co', '.net', '.org', '.info']
@@ -328,7 +325,7 @@ module Catphish
 ╚██████╗██║  ██║   ██║   ██║     ██║  ██║██║███████║██║  ██║
  ╚═════╝╚═╝  ╚═╝   ╚═╝   ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝
                                                     [v]#{VERSION} 
-                                               Author: Mr. V & Picat 
+                                       Author: Mr. V & Picat 
                                            Web: ring0lab.com                                                                       
     "
   end
