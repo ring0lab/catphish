@@ -10,7 +10,7 @@ bundle install
 + New option allows a user to choose a specific set of top-level domains
 
 # Current Algorithms
-* SingularOrPluralise 
+* SingularOrPluralise
 * prependOrAppend
 * doubleExtensions
 * mirrorization
