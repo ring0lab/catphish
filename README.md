@@ -42,6 +42,42 @@ Options:
   -P, --Punycode                             Use the punycode method.
   -h, --help                                 Show this message
 ```
+
+## Docker
+
+You can also run the tool with Docker! This lets you try it out without any of the required dependencies (ruby), except
+Docker itself. This presumes that you have the docker daemon installed. If not, see
+[Docker's documentation](https://docs.docker.com/engine/installation/).
+
+First, build the container
+
+```
+$ cd path/to/repository
+
+# Generate a tag so we know how to find the container later to run it. You can use anything (latest is common);
+# here the git hash is used.
+$ TAG=$(git rev-parse --short HEAD)
+
+# Run the build
+$ docker build --tag "catphish:${TAG}" .
+
+# Eventually docker will print something like:
+#
+#   Successfully built 8f0b8bfe0c41
+#   Successfully tagged catphish:f947517
+
+```
+
+Perfect! Now, you can execute catphish via Docker:
+
+```
+$ docker run \
+    --rm=true \
+    "catphish:${TAG}" \
+        --Domain ring0labs.com \
+        --All
+```
+
 # In Action
 
 ![alt tag](https://github.com/ring0lab/catphish/blob/master/image1.png)
