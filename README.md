@@ -2,12 +2,6 @@
 ```
 bundle install
 ```
-# Current CATPHISH v.1.0.0
-
-+ Improved coding structure
-+ Improved parsing options
-+ Improved user interface
-+ New option allows a user to choose a specific set of top-level domains
 
 # Current Algorithms
 * SingularOrPluralise
