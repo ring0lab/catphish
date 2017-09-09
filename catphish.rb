@@ -7,14 +7,17 @@
 # web: www.ring0lab.com
 
 require 'set'
-require 'trollop'
+require 'trollop/subcommands'
 require 'resolv'
 require 'simpleidn'
 require 'whois-parser'
+require 'rest-client'
+require 'csv'
+require 'nokogiri'
 
 module Catphish
 
-  VERSION = '1.0.0'
+  VERSION = '1.1.0'
 
   # Some popular domains to use.
   POPULAR_TOP_DOMAINS = ['.com', '.co', '.net', '.org', '.info']
@@ -275,6 +278,76 @@ module Catphish
     end
   end
 
+  # Checking for Expired Domains Network
+  # Catphish is currently supporting Fortiguard, Juniper, and Trustwave for URL filtering check.
+	# Future support: PALTO ALTO and SonicWall.
+  def self.check_expired_domains(domain, check, username, password)
+  	container = []
+  	
+  	if !check
+	  	# Login 
+	  	RestClient.post('https://member.expireddomains.net/login/', {login: username, password: password}) do |res|
+	  		if res.headers[:location].include?("error=1")
+	  			puts "Your expireddomains.net account is invalid. Please check your account again."
+	  			exit 1
+	  		else
+	  			RestClient.get("https://member.expireddomains.net/export/search/?export=csv&falexa=1&flimit=50&fstatuscomfree=22&fstatusnetfree=22&fstatusorgfree=22&fstatusbizfree=22&fstatusinfofree=22&q=#{domain}&fprice=100&fstatususfree=22&fstatusukfree=22&fstatuscofree=22&fwhois=22
+				", {Cookie: res.headers[:set_cookie].to_s.split(';')[0].slice!(2, res.headers[:set_cookie].to_s.size)}) do |res|
+					CSV.parse(res.body, {:col_sep => ";"}) do |line|
+						unless line[4] == "domaincc"
+							container << [line[4], line[14]]
+						end
+					end
+	  			end
+	  		end
+	  	end
+	  	check_url_filter(container)
+	  else
+	  	container << [domain]
+	  	check_url_filter(container)
+	  end
+  end
+
+  def self.check_url_filter(container)
+  	printf "%-30s %-30s %s\n\n", "Domain", "Age", "Categorize"
+  	container.each do |domain|
+  		printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
+  		printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
+  		printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
+  	end
+  end
+
+  # Check Fortiguard URL Filter
+  def self.check_fortiguard(domain)
+  	RestClient.get("https://fortiguard.com/webfilter?q=#{domain}") do |res|
+  		return Nokogiri::HTML(res.body).at('meta[name="og:description"]')['content'].split(':')[1]
+  	end
+  end
+
+  # Check Juniper URL Filter
+  def self.check_juniper(domain)
+  	RestClient.post("http://mtas.surfcontrol.com/mtas/Juniper-Results.php", {url: domain, submit1: 'Test Site'}) do |res|
+  		if res.body.split(/categorized as \<B\>(.*?)\<BR\>/)[1] == ' '
+  			return 'Unknown'
+  		else 
+  			return res.body.split(/categorized as \<B\>(.*?)\<BR\>/)[1]
+  		end
+  	end
+  end
+
+  #Check Trustwave URL Filter
+  def self.check_trustwave(domain)
+  	RestClient.post("https://www3.trustwave.com/support/m86filtercheck.asp", {checkurl: domain, Submit: 'Check Database'}) do |res|
+  		if res.body.split(/The URL \<b\>.*\<\/b\>(.*?)\<\/p\>/)[1] == ' is not found in the database.'
+  			return 'Unknown'
+  		elsif res.body.include?("daily quota")
+  			return 'Daily query limit exceeded'
+  		else
+  			return Nokogiri::HTML(res.body).css('li')[146].text
+  		end
+  	end
+  end
+
   # The "main" method of sorts of the application.
   def self.start(domain_container, domain_types: POPULAR_TOP_DOMAINS, all: false, punycode: false, header: false)
     if punycode
@@ -335,79 +408,138 @@ end
 # Default to a help menu if nothing has been given.
 ARGV[0] = '-h' if ARGV.empty?
 
-opts = Trollop::options do
-  banner Catphish.logo
-  opt :logo,                  "ASCII art banner",                                   type: :bool,     default: true
+Trollop::Subcommands::register_global do
+  banner <<-END
+#{Catphish.logo}
+Usage
+  #{File.basename($0)} [global options] COMMAND [command options]
+
+COMMANDS
+  generate                    Generate domains
+  expired                     Find available expired domains (experimental)
+
+Additional help
+  #{File.basename($0)} COMMAND -h
+
+Options
+  END
+  opt :logo, 	              "ASCII art banner", 									 type: :bool, default: true
   opt :column_header,         "Header for each column of the output",               type: :bool,     default: true
   opt :Domain,                "Target domain to analyze",                           type: :string,  required: (ARGV[0] == '-h' ? false : true)
-  opt :type,                  "Type of level domains: (popular, country, generic)", type: :string,   default: 'popular'
   opt :Verbose,               "Show all domains, including non-available ones",     type: :bool,     default: false
-  opt :All,                   "Use all of the possible methods",                    type: :bool,     default: false
-  opt :Mirrorization,         "Use the mirrorization method.",                      type: :bool,     default: false
-  opt :singular_or_pluralise, "Use the singular or pluralise method.",              type: :bool,     default: false
-  opt :prepend_or_append,     "Use the prepend or append method.",                  type: :bool,     default: false
-  opt :Top_level_domains,     "Use a specific ( set of ) top-level domain(s).",     type: :strings, required: false
-  opt :Homoglyphs,            "Use the homoglyphs method.",                         type: :bool,     default: false
-  opt :double_extensions,     "Use the double extensions method",                   type: :bool,     default: false
-  opt :Dash_omission,         "Use the dash omission method.",                      type: :bool,     default: false
-  opt :Punycode,              "Use the punycode method.",                           type: :bool,     default: false
 end
+
+Trollop::Subcommands::register_subcommand('generate') do 
+  banner <<-END
+#{Catphish.logo}
+Usage
+  #{File.basename($0)} -D [domain] generate [options]
+Options
+  END
+  opt :type,                  "Type of level domains: (popular, country, generic)", type: :string,   default: 'popular'   
+  opt :All,                   "Use all of the possible methods",                    type: :bool,     default: false
+  opt :Mirrorization,         "Use the mirrorization method",                       type: :bool,     default: false
+  opt :singular_or_pluralise, "Use the singular or pluralise method",               type: :bool,     default: false
+  opt :prepend_or_append,     "Use the prepend or append method",                   type: :bool,     default: false
+  opt :Top_level_domains,     "Use a specific ( set of ) top-level domain(s)",      type: :strings, required: false
+  opt :Homoglyphs,            "Use the homoglyphs method",                          type: :bool,     default: false
+  opt :double_extensions,     "Use the double extensions method",                   type: :bool,     default: false
+  opt :Dash_omission,         "Use the dash omission method",                       type: :bool,     default: false
+  opt :Punycode,              "Use the punycode method",                            type: :bool,     default: false
+end
+
+Trollop::Subcommands::register_subcommand('expired') do
+  banner <<-END
+#{Catphish.logo}
+Usage
+  #{File.basename($0)} -D [domain] expired [options]
+  \nAn expireddomains.net account is required to check for available expired domains.\n
+Options
+  END
+  opt :check,                  "Check category of the provided domain (No account needed)", 						  type: :bool,   default: false
+  opt :username,							 "expireddomains.net Username",																	type: :string, required: false
+  opt :password,							 "expireddomains.net Password", 																	type: :string, required: false
+end
+
+opts = Trollop::Subcommands::parse!
 
 # If given top level domains, use those. Otherwise, use whatever was 
 # given for the type or default to popular domains.
-if opts[:Top_level_domains]
-  type = Catphish.new_container do |container|
-    opts[:Top_level_domains].each do |domain|
-      domain = "." + domain unless domain[0] == "."
-      container << domain
-    end
-    container
-  end
-else
-  case opts[:type].downcase.to_sym
-  when :country
-    type = Catphish::COUNTRY_TOP_DOMAINS
-  when :generic 
-    type = Catphish::GENERIC_DOMAINS
-  else
-    type = Catphish::POPULAR_TOP_DOMAINS
-  end
-end
+
+case opts.subcommand
+when "generate"
+	if opts.subcommand_options[:Top_level_domains]
+	  type = Catphish.new_container do |container|
+	    opts.subcommand_options[:Top_level_domains].each do |domain|
+	      domain = "." + domain unless domain[0] == "."
+	      container << domain
+	    end
+	    container
+	  end
+	else
+	  case opts.subcommand_options[:type].downcase.to_sym
+	  when :country
+	    type = Catphish::COUNTRY_TOP_DOMAINS
+	  when :generic 
+	    type = Catphish::GENERIC_DOMAINS
+	  else
+	    type = Catphish::POPULAR_TOP_DOMAINS
+	  end
+	end
 
 # Get all of the domains we're interested in processing.
-domains = Catphish.new_container do |container|
-  if opts[:All]
-    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
-      Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
-        container << domain
-      end
-    end
-  else
-    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
-      next unless opts[opt]
-      Catphish.send(opt.to_s.downcase.to_sym, opts[:Domain]).each do |domain|
-        container << domain
-      end
-    end
-  end
-  container
-end
+	domains = Catphish.new_container do |container|
+	  if opts.subcommand_options[:All]
+	    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
+	      Catphish.send(opt.to_s.downcase.to_sym, opts.global_options[:Domain]).each do |domain|
+	        container << domain
+	      end
+	    end
+	  else
+	    [:Mirrorization, :singular_or_pluralise, :prepend_or_append, :Homoglyphs, :double_extensions, :Dash_omission, :Punycode].each do |opt|
+	      next unless opts.subcommand_options[opt]
+	      Catphish.send(opt.to_s.downcase.to_sym, opts.global_options[:Domain]).each do |domain|
+	        container << domain
+	      end
+	    end
+	  end
+	  container
+	end
 
-# If there are no domains to process, then fail.
-if domains.empty?
-  puts "Nothing to process ( try other options )!"
-  exit 1
-end
+	# If there are no domains to process, then fail.
+	if domains.empty?
+		puts "Nothing to process ( try other options )!"
+	  exit 1
+	end
 
 # Check if punycode is going to show up to the party.
-if opts[:Punycode] || opts[:All]
-  puny = true
-else
-  puny = false
+	if opts.subcommand_options[:Punycode] || opts.subcommand_options[:All]
+	  puny = true
+	else
+	  puny = false
+	end
+
+	# Print the logo to the screen, or maybe not.
+	puts Catphish.logo if opts.global_options[:logo]
+
+	# Start the heavy logic.
+	Catphish.start(domains, domain_types: type, all: opts.global_options[:Verbose], punycode: puny, header: opts.global_options[:column_header])
+when "expired"
+	# Print the logo to the screen, or maybe not.
+	puts Catphish.logo if opts.global_options[:logo]
+	# Start the heavy logic.
+	if !opts.subcommand_options[:check] && (!opts.subcommand_options[:username] || !opts.subcommand_options[:password])
+		puts "Error: options '--username' and '--password' need parameters for command 'expired'.
+Try --help for help.
+"
+		exit 1
+	end
+
+	if opts.subcommand_options[:check]
+		Catphish.check_expired_domains(opts.global_options[:Domain], opts.subcommand_options[:check], '', '')
+	end
+
+	if opts.subcommand_options[:username] && opts.subcommand_options[:password]
+		Catphish.check_expired_domains(opts.global_options[:Domain], opts.subcommand_options[:check], opts.subcommand_options[:username], opts.subcommand_options[:password])	
+	end
 end
-
-# Print the logo to the screen, or maybe not.
-puts Catphish.logo if opts[:logo]
-
-# Start the heavy logic.
-Catphish.start(domains, domain_types: type, all: opts[:Verbose], punycode: puny, header: opts[:column_header])

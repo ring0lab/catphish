@@ -12,29 +12,40 @@ bundle install
 * dashOmission
 * Punycode
 
+Version 1.1.0:
+```
+The parser for command line options is modified to compensate with the new expired feature. This new option structure gives the tool a new look and more organized.
+```
+
 # Usage
 Running the tool:
 ```
-ruby catphish.rb -D DOMAIN [options]
+catphish.rb [global options] COMMAND [command options]
 ```
 Options:
 ```
-  -l, --logo, --no-logo                      ASCII art banner (default: true)
-  -c, --column-header, --no-column-header    Header for each column of the output (default: true)
+  generate                    Generate domains
+  expired                     Find available expired domains
+(experimental)
+
+Additional help
+  catphish.rb COMMAND -h
+
+Options
+  -l, --logo, --no-logo                      ASCII art banner
+                                             (default: true)
+  -c, --column-header, --no-column-header    Header for each column
+                                             of the output (default:
+                                             true)
   -D, --Domain=<s>                           Target domain to analyze
-  -t, --type=<s>                             Type of level domains: (popular, country, generic) (default:
-                                             popular)
-  -V, --Verbose                              Show all domains, including non-available ones
-  -A, --All                                  Use all of the possible methods
-  -M, --Mirrorization                        Use the mirrorization method.
-  -s, --singular-or-pluralise                Use the singular or pluralise method.
-  -p, --prepend-or-append                    Use the prepend or append method.
-  -T, --Top-level-domains=<s+>               Use a specific ( set of ) top-level domain(s).
-  -H, --Homoglyphs                           Use the homoglyphs method.
-  -d, --double-extensions                    Use the double extensions method
-  -a, --Dash-omission                        Use the dash omission method.
-  -P, --Punycode                             Use the punycode method.
+  -V, --Verbose                              Show all domains,
+                                             including non-available
+                                             ones
   -h, --help                                 Show this message
+```
+Example:
+```
+catphish.rb -D DOMAIN generate -A
 ```
 
 ## Docker
