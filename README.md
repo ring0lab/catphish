@@ -1,3 +1,6 @@
+# CATPHISH
+Generate similar-looking domains for phishing attacks. Check expired domains and their categorized domain status to evade proxy categorisation. Whitelisted domains are perfect for your C2 servers. Perfect for Red Team engagements. 
+
 # Installation
 ```
 bundle install
