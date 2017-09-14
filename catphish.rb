@@ -14,6 +14,7 @@ require 'whois-parser'
 require 'rest-client'
 require 'csv'
 require 'nokogiri'
+require 'json'
 
 module Catphish
 
@@ -279,43 +280,89 @@ module Catphish
   end
 
   # Checking for Expired Domains Network
-  # Catphish is currently supporting Fortiguard, Juniper, and Trustwave for URL filtering check.
-  # Future support: PALTO ALTO and SonicWall.
-  def self.check_expired_domains(domain, check, username, password)
+  # Catphish is currently supporting Fortiguard, Juniper, Trustwave, BlueCoat, and IBM for URL filtering check.
+  # Future support: PALTO ALTO, Mcafee and SonicWall.
+  def self.check_expired_domains(domain, check, proxy)
     container = []
+    t_domain = []
+    t_year = []
+    total = 0
+
+    payload = 
+    {
+    	fdomainstart: '',
+    	fdomain: '',
+    	fdomainend: '',
+    	fsimilarweb: '1',
+    	fwhois: '22',
+    	ftrmaxhost: '0',
+    	ftrminhost: '0',
+    	ftrbl: '0',
+    	ftrdomainpop: '0',
+    	ftrabirth_year: '0',
+    	q: domain,
+    	button_submit: 'Apply Filter'
+    }
     
     if !check
-      # Login 
-      RestClient.post('https://member.expireddomains.net/login/', {login: username, password: password}) do |res|
-        if res.headers[:location].include?("error=1")
-          puts "Your expireddomains.net account is invalid. Please check your account again."
-          exit 1
-        else
-          RestClient.get("https://member.expireddomains.net/export/search/?export=csv&falexa=1&flimit=50&fstatuscomfree=22&fstatusnetfree=22&fstatusorgfree=22&fstatusbizfree=22&fstatusinfofree=22&q=#{domain}&fprice=100&fstatususfree=22&fstatusukfree=22&fstatuscofree=22&fwhois=22
-        ", {Cookie: res.headers[:set_cookie].to_s.split(';')[0].slice!(2, res.headers[:set_cookie].to_s.size)}) do |res|
-          CSV.parse(res.body, {:col_sep => ";"}) do |line|
-            unless line[4] == "domaincc"
-              container << [line[4], line[14]]
-            end
-          end
-          end
-        end
-      end
-      check_url_filter(container)
+    	RestClient.post("https://www.expireddomains.net/domain-name-search/?q=#{domain}", payload) do |res|
+    		if total == 0
+    			total = res.body.to_s.split(/About \<strong\>(.*?)\s\<\/strong\> Domains/)[1].to_i
+    		end
+    		Nokogiri::HTML(res.body).css('td.field_abirth').each do |year|
+	    		t_year << year.to_s.split(/title="First seen\s(.*?)\,/)[1]
+    		end
+    		Nokogiri::HTML(res.body).css('td.field_domain').each do |domain|
+    			t_domain << domain.to_s.split(/title\=\"(.*?)\"/)[1]
+    		end
+    	end
+
+    	(0...t_domain.size).each do |i|
+    		container << [t_domain[i], t_year[i]]
+    	end
+      check_url_filter(container, proxy, total)
     else
       container << [domain]
-      check_url_filter(container)
+      check_url_filter(container, proxy, 1)
     end
-
   end
 
-  def self.check_url_filter(container)
+  def self.check_url_filter(container, proxy, total)
+  	puts "Found #{total} expired domains\n"
     printf "%-30s %-30s %s\n\n", "Domain", "Age", "Categorize"
-    container.each do |domain|
-      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
-      printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
-      printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
-    end
+    # Check user's proxy input
+    case proxy.downcase
+   	when 'all'
+   		container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
+	      printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
+	      printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
+	      printf "%-30s %-30s %s\n\n", '', '', "BlueCoat: " + check_bluecoat(domain[0])
+	      printf "%-30s %-30s %s\n\n", '', '', "IBM-Xforce: " + check_ibm(domain[0])
+	    end
+	  when 'fortiguard'
+	  	container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
+	    end
+	  when 'juniper'
+	  	container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Juniper: " + check_juniper(domain[0])
+	    end
+	  when 'trustwave'
+	  	container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Trustwave: " + check_trustwave(domain[0])
+	    end
+	  when 'bluecoat'
+	  	container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "BlueCoat: " + check_bluecoat(domain[0])
+	    end
+	  when 'ibm'
+	  	container.each do |domain|
+	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "IBM-Xforce: " + check_ibm(domain[0])
+	    end
+	  else
+	  	puts "Error: option '-P' needs a valid proxy type."
+   	end
   end
 
   # Check Fortiguard URL Filter
@@ -347,6 +394,34 @@ module Catphish
         return Nokogiri::HTML(res.body).css('li')[146].text
       end
     end
+  end
+
+  # Check Bluecoat URL Filter
+  def self.check_bluecoat(domain)
+  	RestClient.post("https://sitereview.bluecoat.com/rest/categorization", {url: domain}) do |res|
+  		return JSON.parse(res.body)["categorization"].to_s.split(/\>(.*?)\<\/a\>/)[1]
+  	end
+  end
+
+  # Check IBM URL Filter
+  def self.check_ibm(domain)
+  	header = 
+	  {
+	  'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
+	  'Accept': 'application/json, text/plain, */*',
+	  'x-ui': 'XFE',
+	  'Origin': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
+	  'Referer': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
+	  'Content-Type': 'application/json;charset=utf-8'
+	  }
+
+  	RestClient.get("https://api.xforce.ibmcloud.com/url/#{domain}", header) do |res|
+  		if JSON.parse(res.body)["error"].to_s == "Not found."
+  			return "Unknown"
+  		else
+  			return JSON.parse(res.body)["result"]["cats"].to_s.split(/\"(.*?)\"/)[1]
+  		end
+  	end
   end
 
   # The "main" method of sorts of the application.
@@ -425,9 +500,9 @@ COMMANDS
 Additional help
   #{File.basename($0)} COMMAND -h
 
-Options
+Global Options
   END
-  opt :logo,                "ASCII art banner",                                    type: :bool, default: true
+  opt :logo,                	"ASCII art banner",                                   type: :bool, default: true
   opt :column_header,         "Header for each column of the output",               type: :bool,     default: true
   opt :Domain,                "Target domain to analyze",                           type: :string,  required: (ARGV[0] == '-h' ? false : true)
   opt :Verbose,               "Show all domains, including non-available ones",     type: :bool,     default: false
@@ -457,12 +532,10 @@ Trollop::Subcommands::register_subcommand('expired') do
 #{Catphish.logo}
 Usage
   #{File.basename($0)} -D [domain] expired [options]
-  \nAn expireddomains.net account is required to check for available expired domains.\n
 Options
   END
-  opt :check,                  "Check category of the provided domain (No account needed)",                         type: :bool,   default: false
-  opt :username,                           "expireddomains.net Username",                                                                 type: :string, required: false
-  opt :password,                           "expireddomains.net Password",                                                                     type: :string, required: false
+  opt :check,                 "Check category of the provided domain",               					 type: :bool,   default: false
+  opt :proxy, 								"Proxy type: Fortiguard, Juniper, Trustwave, BlueCoat, IBM", 				 type: :string, default: 'all'
 end
 
 opts = Trollop::Subcommands::parse!
@@ -532,18 +605,5 @@ when "expired"
   # Print the logo to the screen, or maybe not.
   puts Catphish.logo if opts.global_options[:logo]
   # Start the heavy logic.
-  if !opts.subcommand_options[:check] && (!opts.subcommand_options[:username] || !opts.subcommand_options[:password])
-    puts "Error: options '--username' and '--password' need parameters for command 'expired'.
-Try --help for help.
-"
-    exit 1
-  end
-
-  if opts.subcommand_options[:check]
-    Catphish.check_expired_domains(opts.global_options[:Domain], opts.subcommand_options[:check], '', '')
-  end
-
-  if opts.subcommand_options[:username] && opts.subcommand_options[:password]
-    Catphish.check_expired_domains(opts.global_options[:Domain], opts.subcommand_options[:check], opts.subcommand_options[:username], opts.subcommand_options[:password])   
-  end
+  Catphish.check_expired_domains(opts.global_options[:Domain], opts.subcommand_options[:check], opts.subcommand_options[:proxy])
 end

@@ -1,5 +1,5 @@
 # CATPHISH
-Generate similar-looking domains for phishing attacks. Check expired domains and their categorized domain status to evade proxy categorisation. Whitelisted domains are perfect for your C2 servers. Perfect for Red Team engagements. 
+Generate similar-looking domains for phishing attacks. Check expired domains and their categorized domain status to evade proxy categorization. Whitelisted domains are perfect for your C2 servers. Perfect for Red Team engagements. 
 
 # Installation
 ```
@@ -46,9 +46,13 @@ Options
                                              ones
   -h, --help                                 Show this message
 ```
-Example:
+Generate all type:
 ```
 catphish.rb -D DOMAIN generate -A
+```
+Check available expired domains:
+```
+catphish.rb -D DOMAIN expired
 ```
 
 ## Docker
