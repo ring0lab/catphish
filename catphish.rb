@@ -290,36 +290,36 @@ module Catphish
 
     payload = 
     {
-    	fdomainstart: '',
-    	fdomain: '',
-    	fdomainend: '',
-    	fsimilarweb: '1',
-    	fwhois: '22',
-    	ftrmaxhost: '0',
-    	ftrminhost: '0',
-    	ftrbl: '0',
-    	ftrdomainpop: '0',
-    	ftrabirth_year: '0',
-    	q: domain,
-    	button_submit: 'Apply Filter'
+      fdomainstart: '',
+      fdomain: '',
+      fdomainend: '',
+      fsimilarweb: '1',
+      fwhois: '22',
+      ftrmaxhost: '0',
+      ftrminhost: '0',
+      ftrbl: '0',
+      ftrdomainpop: '0',
+      ftrabirth_year: '0',
+      q: domain,
+      button_submit: 'Apply Filter'
     }
     
     if !check
-    	RestClient.post("https://www.expireddomains.net/domain-name-search/?q=#{domain}", payload) do |res|
-    		if total == 0
-    			total = res.body.to_s.split(/About \<strong\>(.*?)\s\<\/strong\> Domains/)[1].to_i
-    		end
-    		Nokogiri::HTML(res.body).css('td.field_abirth').each do |year|
-	    		t_year << year.to_s.split(/title="First seen\s(.*?)\,/)[1]
-    		end
-    		Nokogiri::HTML(res.body).css('td.field_domain').each do |domain|
-    			t_domain << domain.to_s.split(/title\=\"(.*?)\"/)[1]
-    		end
-    	end
+      RestClient.post("https://www.expireddomains.net/domain-name-search/?q=#{domain}", payload) do |res|
+        if total == 0
+          total = res.body.to_s.split(/About \<strong\>(.*?)\s\<\/strong\> Domains/)[1].to_i
+        end
+        Nokogiri::HTML(res.body).css('td.field_abirth').each do |year|
+          t_year << year.to_s.split(/title="First seen\s(.*?)\,/)[1]
+        end
+        Nokogiri::HTML(res.body).css('td.field_domain').each do |domain|
+          t_domain << domain.to_s.split(/title\=\"(.*?)\"/)[1]
+        end
+      end
 
-    	(0...t_domain.size).each do |i|
-    		container << [t_domain[i], t_year[i]]
-    	end
+      (0...t_domain.size).each do |i|
+        container << [t_domain[i], t_year[i]]
+      end
       check_url_filter(container, proxy, total)
     else
       container << [domain]
@@ -328,41 +328,41 @@ module Catphish
   end
 
   def self.check_url_filter(container, proxy, total)
-  	puts "Found #{total} expired domains\n"
+    puts "Found #{total} expired domains\n"
     printf "%-30s %-30s %s\n\n", "Domain", "Age", "Categorize"
     # Check user's proxy input
     case proxy.downcase
-   	when 'all'
-   		container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
-	      printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
-	      printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
-	      printf "%-30s %-30s %s\n\n", '', '', "BlueCoat: " + check_bluecoat(domain[0])
-	      printf "%-30s %-30s %s\n\n", '', '', "IBM-Xforce: " + check_ibm(domain[0])
-	    end
-	  when 'fortiguard'
-	  	container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
-	    end
-	  when 'juniper'
-	  	container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Juniper: " + check_juniper(domain[0])
-	    end
-	  when 'trustwave'
-	  	container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Trustwave: " + check_trustwave(domain[0])
-	    end
-	  when 'bluecoat'
-	  	container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "BlueCoat: " + check_bluecoat(domain[0])
-	    end
-	  when 'ibm'
-	  	container.each do |domain|
-	      printf "%-30s %-30s %s\n\n", domain[0], domain[1], "IBM-Xforce: " + check_ibm(domain[0])
-	    end
-	  else
-	  	puts "Error: option '-P' needs a valid proxy type."
-   	end
+    when 'all'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
+        printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
+        printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
+        printf "%-30s %-30s %s\n\n", '', '', "BlueCoat: " + check_bluecoat(domain[0])
+        printf "%-30s %-30s %s\n\n", '', '', "IBM-Xforce: " + check_ibm(domain[0])
+      end
+    when 'fortiguard'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
+      end
+    when 'juniper'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Juniper: " + check_juniper(domain[0])
+      end
+    when 'trustwave'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Trustwave: " + check_trustwave(domain[0])
+      end
+    when 'bluecoat'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "BlueCoat: " + check_bluecoat(domain[0])
+      end
+    when 'ibm'
+      container.each do |domain|
+        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "IBM-Xforce: " + check_ibm(domain[0])
+      end
+    else
+      puts "Error: option '-P' needs a valid proxy type."
+    end
   end
 
   # Check Fortiguard URL Filter
@@ -398,30 +398,30 @@ module Catphish
 
   # Check Bluecoat URL Filter
   def self.check_bluecoat(domain)
-  	RestClient.post("https://sitereview.bluecoat.com/rest/categorization", {url: domain}) do |res|
-  		return JSON.parse(res.body)["categorization"].to_s.split(/\>(.*?)\<\/a\>/)[1]
-  	end
+    RestClient.post("https://sitereview.bluecoat.com/rest/categorization", {url: domain}) do |res|
+      return JSON.parse(res.body)["categorization"].to_s.split(/\>(.*?)\<\/a\>/)[1]
+    end
   end
 
   # Check IBM URL Filter
   def self.check_ibm(domain)
-  	header = 
-	  {
-	  'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
-	  'Accept': 'application/json, text/plain, */*',
-	  'x-ui': 'XFE',
-	  'Origin': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
-	  'Referer': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
-	  'Content-Type': 'application/json;charset=utf-8'
-	  }
+    header = 
+    {
+    'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)',
+    'Accept': 'application/json, text/plain, */*',
+    'x-ui': 'XFE',
+    'Origin': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
+    'Referer': "https://exchange.xforce.ibmcloud.com/url/#{domain}",
+    'Content-Type': 'application/json;charset=utf-8'
+    }
 
-  	RestClient.get("https://api.xforce.ibmcloud.com/url/#{domain}", header) do |res|
-  		if JSON.parse(res.body)["error"].to_s == "Not found."
-  			return "Unknown"
-  		else
-  			return JSON.parse(res.body)["result"]["cats"].to_s.split(/\"(.*?)\"/)[1]
-  		end
-  	end
+    RestClient.get("https://api.xforce.ibmcloud.com/url/#{domain}", header) do |res|
+      if JSON.parse(res.body)["error"].to_s == "Not found."
+        return "Unknown"
+      else
+        return JSON.parse(res.body)["result"]["cats"].to_s.split(/\"(.*?)\"/)[1]
+      end
+    end
   end
 
   # The "main" method of sorts of the application.
@@ -502,7 +502,7 @@ Additional help
 
 Global Options
   END
-  opt :logo,                	"ASCII art banner",                                   type: :bool, default: true
+  opt :logo,                  "ASCII art banner",                                   type: :bool, default: true
   opt :column_header,         "Header for each column of the output",               type: :bool,     default: true
   opt :Domain,                "Target domain to analyze",                           type: :string,  required: (ARGV[0] == '-h' ? false : true)
   opt :Verbose,               "Show all domains, including non-available ones",     type: :bool,     default: false
@@ -534,8 +534,8 @@ Usage
   #{File.basename($0)} -D [domain] expired [options]
 Options
   END
-  opt :check,                 "Check category of the provided domain",               					 type: :bool,   default: false
-  opt :proxy, 								"Proxy type: Fortiguard, Juniper, Trustwave, BlueCoat, IBM", 				 type: :string, default: 'all'
+  opt :check,                 "Check category of the provided domain",                         type: :bool,   default: false
+  opt :proxy,                 "Proxy type: Fortiguard, Juniper, Trustwave, BlueCoat, IBM",         type: :string, default: 'all'
 end
 
 opts = Trollop::Subcommands::parse!
