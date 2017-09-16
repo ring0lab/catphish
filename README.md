@@ -54,6 +54,14 @@ Check available expired domains:
 ```
 catphish.rb -D DOMAIN expired
 ```
+Check against a specific domain for categorization status:
+```
+catphish.rb -D DOMAIN expired -c
+```
+Check all available expired domains against a specific vendor
+```
+catphish.rb -D DOMAIN expired -p PROXY_TYPE
+```
 
 ## Docker
 
