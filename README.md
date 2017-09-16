@@ -27,6 +27,7 @@ catphish.rb [global options] COMMAND [command options]
 ```
 Options:
 ```
+COMMANDS
   generate                    Generate domains
   expired                     Find available expired domains
 (experimental)
@@ -34,7 +35,7 @@ Options:
 Additional help
   catphish.rb COMMAND -h
 
-Options
+Global Options
   -l, --logo, --no-logo                      ASCII art banner
                                              (default: true)
   -c, --column-header, --no-column-header    Header for each column
