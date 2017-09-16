@@ -330,45 +330,37 @@ module Catphish
   def self.check_url_filter(container, proxy, total)
     puts "Found #{total} expired domains\n"
     printf "%-30s %-30s %s\n\n", "Domain", "Age", "Categorize"
-    # Check user's proxy input
-    case proxy.downcase
-    when 'all'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
-        printf "%-30s %-30s %s\n\n", '', '', "Juniper: " + check_juniper(domain[0])
-        printf "%-30s %-30s %s\n\n", '', '', "Trustwave: " + check_trustwave(domain[0])
-        printf "%-30s %-30s %s\n\n", '', '', "BlueCoat: " + check_bluecoat(domain[0])
-        printf "%-30s %-30s %s\n\n", '', '', "IBM-Xforce: " + check_ibm(domain[0])
-      end
-    when 'fortiguard'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Fortiguard:" + check_fortiguard(domain[0])
-      end
-    when 'juniper'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Juniper: " + check_juniper(domain[0])
-      end
-    when 'trustwave'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "Trustwave: " + check_trustwave(domain[0])
-      end
-    when 'bluecoat'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "BlueCoat: " + check_bluecoat(domain[0])
-      end
-    when 'ibm'
-      container.each do |domain|
-        printf "%-30s %-30s %s\n\n", domain[0], domain[1], "IBM-Xforce: " + check_ibm(domain[0])
-      end
-    else
-      puts "Error: option '-P' needs a valid proxy type."
-    end
+    
+    proxies = 
+    {
+    	Fortiguard: 'check_fortiguard',
+    	Juniper: 'check_juniper',
+    	Trustwave: 'check_trustwave',
+    	Bluecoat: 'check_bluecoat',
+    	Ibm: 'check_ibm'
+    }
+
+    # Improve Dynamic Calling for proxy selection.
+    begin
+	    container.each do |domain|
+	    	if proxy.downcase == 'all'
+		    	proxies.each do |k, v|
+		    		printf "%-30s %-30s %s\n\n", domain[0], domain[1], "#{k.upcase}: " + Catphish.public_send("#{v}", domain[0])
+		    	end
+	    	else
+	    		printf "%-30s %-30s %s\n\n", domain[0], domain[1], "#{proxy.upcase}: " + Catphish.public_send(proxies[:"#{proxy.capitalize}"], domain[0])
+	    	end
+	    	printf "%-30s", "-" * 100 + "\n"
+	    end
+	  rescue
+	  	puts "Error: option '-P' needs a valid proxy type."
+	  end
   end
 
   # Check Fortiguard URL Filter
   def self.check_fortiguard(domain)
     RestClient.get("https://fortiguard.com/webfilter?q=#{domain}") do |res|
-      return Nokogiri::HTML(res.body).at('meta[name="og:description"]')['content'].split(':')[1]
+      return Nokogiri::HTML(res.body).at('meta[name="og:description"]')['content'].split(':')[1][1..-1]
     end
   end
 
