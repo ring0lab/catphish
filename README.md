@@ -96,7 +96,7 @@ $ docker run \
     --rm=true \
     "catphish:${TAG}" \
         --Domain ring0labs.com \
-        --All
+        generate --All
 ```
 
 # In Action
